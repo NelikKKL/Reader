@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Reader</string>
+    <string name="add_books">Добавить</string>
+    <string name="library_empty">Библиотека пуста. Добавьте книги в форматах FB2, EPUB или TXT.</string>
+    <string name="delete">Удалить</string>
+    <string name="delete_title">Удалить книгу?</string>
+    <string name="delete_text">Книга «%1$s» будет удалена из библиотеки.</string>
+    <string name="cancel">Отмена</string>
+    <string name="back">Назад</string>
+    <string name="chapters">Главы</string>
+    <string name="settings">Настройки чтения</string>
+    <string name="font_size">Размер шрифта</string>
+    <string name="serif">Шрифт с засечками</string>
+    <string name="prev_chapter">Пред. глава</string>
+    <string name="next_chapter">След. глава</string>
+    <string name="chapter_n">Глава %1$d</string>
+    <string name="import_failed">Не удалось открыть файл</string>
+</resources>
