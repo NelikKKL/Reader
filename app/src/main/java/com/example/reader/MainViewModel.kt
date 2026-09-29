@@ -27,6 +27,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val chapters = MutableStateFlow<List<Chapter>?>(null)
     val fontSize = MutableStateFlow(prefs.getFloat("font", 19f))
     val serif = MutableStateFlow(prefs.getBoolean("serif", true))
+    val darkTheme = MutableStateFlow(prefs.getBoolean("dark", true))
 
     fun importBooks(uris: List<Uri>) {
         viewModelScope.launch {
@@ -76,6 +77,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setFontSize(v: Float) {
         fontSize.value = v
         prefs.edit().putFloat("font", v).apply()
+    }
+
+    fun setDarkTheme(v: Boolean) {
+        darkTheme.value = v
+        prefs.edit().putBoolean("dark", v).apply()
     }
 
     fun setSerif(v: Boolean) {

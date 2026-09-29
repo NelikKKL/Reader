@@ -1,7 +1,9 @@
 package com.example.reader
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -23,8 +26,17 @@ import com.example.reader.ui.ReaderTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent { ReaderTheme { ReaderApp() } }
+        setContent {
+            val vm: MainViewModel = viewModel()
+            val dark by vm.darkTheme.collectAsState()
+            DisposableEffect(dark) {
+                val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
+                else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
+            ReaderTheme(dark) { ReaderApp(vm) }
+        }
     }
 }
 
@@ -37,6 +49,7 @@ fun ReaderApp(vm: MainViewModel = viewModel()) {
     val failed by vm.failed.collectAsState()
     val fontSize by vm.fontSize.collectAsState()
     val serif by vm.serif.collectAsState()
+    val dark by vm.darkTheme.collectAsState()
 
     val book = open
     val list = chapters
@@ -65,6 +78,8 @@ fun ReaderApp(vm: MainViewModel = viewModel()) {
             serif = serif,
             onFontSize = vm::setFontSize,
             onSerif = vm::setSerif,
+            darkTheme = dark,
+            onDarkTheme = vm::setDarkTheme,
             onProgress = { c, o -> vm.saveProgress(book.id, c, o) },
             onBack = vm::close
         )

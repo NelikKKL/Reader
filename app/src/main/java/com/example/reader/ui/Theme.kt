@@ -1,7 +1,6 @@
 package com.example.reader.ui
 
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -11,8 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
-fun ReaderTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun ReaderTheme(dark: Boolean = true, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val scheme = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->

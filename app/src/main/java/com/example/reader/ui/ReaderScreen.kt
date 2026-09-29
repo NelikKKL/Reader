@@ -149,6 +149,8 @@ fun ReaderScreen(
     serif: Boolean,
     onFontSize: (Float) -> Unit,
     onSerif: (Boolean) -> Unit,
+    darkTheme: Boolean,
+    onDarkTheme: (Boolean) -> Unit,
     onProgress: (chapter: Int, offset: Int) -> Unit,
     onBack: () -> Unit
 ) {
@@ -193,7 +195,7 @@ fun ReaderScreen(
     }
 
     if (ui.sheet == Sheet.Settings) {
-        SettingsSheet(fontSize, serif, onFontSize, onSerif) { ui.sheet = Sheet.None }
+        SettingsSheet(fontSize, serif, onFontSize, onSerif, darkTheme, onDarkTheme) { ui.sheet = Sheet.None }
     }
 }
 
@@ -391,6 +393,8 @@ private fun SettingsSheet(
     serif: Boolean,
     onFontSize: (Float) -> Unit,
     onSerif: (Boolean) -> Unit,
+    darkTheme: Boolean,
+    onDarkTheme: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -414,6 +418,14 @@ private fun SettingsSheet(
             ) {
                 Text(stringResource(R.string.serif))
                 Switch(checked = serif, onCheckedChange = onSerif)
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(stringResource(R.string.dark_theme))
+                Switch(checked = darkTheme, onCheckedChange = onDarkTheme)
             }
         }
     }

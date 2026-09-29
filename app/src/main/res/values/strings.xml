@@ -11,6 +11,7 @@
     <string name="chapters">Главы</string>
     <string name="settings">Настройки чтения</string>
     <string name="font_size">Размер шрифта</string>
+    <string name="dark_theme">Тёмная тема</string>
     <string name="serif">Шрифт с засечками</string>
     <string name="prev_chapter">Пред. глава</string>
     <string name="next_chapter">След. глава</string>
