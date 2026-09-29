@@ -30,6 +30,30 @@ object BookParser {
 
     private fun local(n: String) = n.substringAfter(':')
 
+    /** Splits huge chapters so that the first screen can be paginated quickly. */
+    fun splitLong(chapters: List<Chapter>, max: Int = 60000, target: Int = 30000): List<Chapter> {
+        val out = ArrayList<Chapter>()
+        for (ch in chapters) {
+            val text = ch.text
+            if (text.length <= max) {
+                out += ch
+                continue
+            }
+            var start = 0
+            var first = true
+            while (start < text.length) {
+                val end = if (text.length - start <= max) text.length else {
+                    val nl = text.indexOf('\n', start + target)
+                    if (nl < 0) text.length else nl + 1
+                }
+                out += Chapter(if (first) ch.title else "", text.substring(start, end).trimEnd('\n'))
+                first = false
+                start = end
+            }
+        }
+        return out
+    }
+
     // ---------------------------------------------------------------- FB2
 
     private fun parseFb2(input: InputStream): ParsedBook {

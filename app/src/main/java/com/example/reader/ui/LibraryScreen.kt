@@ -12,19 +12,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -32,6 +39,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.reader.R
 import com.example.reader.data.Book
+import com.example.reader.data.LibraryView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -73,7 +82,10 @@ fun LibraryScreen(
     onImport: (List<Uri>) -> Unit,
     onOpen: (Book) -> Unit,
     onDelete: (Book) -> Unit,
-    onFailedShown: () -> Unit
+    onFailedShown: () -> Unit,
+    onOpenSettings: () -> Unit,
+    view: LibraryView,
+    onViewChange: (LibraryView) -> Unit
 ) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
         if (it.isNotEmpty()) onImport(it)
@@ -88,12 +100,38 @@ fun LibraryScreen(
         }
     }
     var toDelete by remember { mutableStateOf<Book?>(null) }
+    var viewMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
+                actions = {
+                    Box {
+                        IconButton(onClick = { viewMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.view_mode))
+                        }
+                        DropdownMenu(expanded = viewMenu, onDismissRequest = { viewMenu = false }) {
+                            listOf(
+                                LibraryView.GRID to R.string.view_grid,
+                                LibraryView.COMPACT to R.string.view_compact,
+                                LibraryView.LIST to R.string.view_list
+                            ).forEach { (v, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(label)) },
+                                    leadingIcon = {
+                                        if (v == view) Icon(Icons.Default.Check, contentDescription = null)
+                                    },
+                                    onClick = { viewMenu = false; onViewChange(v) }
+                                )
+                            }
+                        }
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
+                    }
+                },
                 scrollBehavior = scroll
             )
         },
@@ -115,15 +153,29 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(128.dp),
-                contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 96.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(books, key = { it.id }) { book ->
-                    BookCard(book, onClick = { onOpen(book) }, onDelete = { toDelete = book })
+            val contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 96.dp)
+            if (view == LibraryView.LIST) {
+                LazyColumn(
+                    contentPadding = contentPadding,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(books, key = { it.id }) { book ->
+                        BookRow(book, onClick = { onOpen(book) }, onDelete = { toDelete = book })
+                    }
+                }
+            } else {
+                val compact = view == LibraryView.COMPACT
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(if (compact) 84.dp else 104.dp),
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(books, key = { it.id }) { book ->
+                        BookCard(book, compact, onClick = { onOpen(book) }, onDelete = { toDelete = book })
+                    }
                 }
             }
             if (importing) {
@@ -149,26 +201,55 @@ fun LibraryScreen(
     }
 }
 
+@Composable
+private fun ProgressLine(progress: Float, modifier: Modifier = Modifier, showPercent: Boolean = true) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        LinearProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) },
+            modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp))
+        )
+        if (showPercent) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "${(progress * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeleteMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.delete)) },
+            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+            onClick = { onDismiss(); onDelete() }
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BookCard(book: Book, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun BookCard(book: Book, compact: Boolean, onClick: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Column(
         Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .combinedClickable(onClick = onClick, onLongClick = { menu = true })
     ) {
-        Card(shape = RoundedCornerShape(16.dp)) {
+        Card(shape = RoundedCornerShape(12.dp)) {
             Cover(book, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             book.title,
-            style = MaterialTheme.typography.titleSmall,
+            style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        if (book.author.isNotBlank()) {
+        if (!compact && book.author.isNotBlank()) {
             Text(
                 book.author,
                 style = MaterialTheme.typography.bodySmall,
@@ -177,13 +258,47 @@ private fun BookCard(book: Book, onClick: () -> Unit, onDelete: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
         }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.delete)) },
-                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                onClick = { menu = false; onDelete() }
-            )
+        Spacer(Modifier.height(4.dp))
+        ProgressLine(book.progress, showPercent = !compact)
+        DeleteMenu(menu, { menu = false }, onDelete)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BookRow(book: Book, onClick: () -> Unit, onDelete: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Card(shape = RoundedCornerShape(10.dp)) {
+            Cover(book, Modifier.width(56.dp).aspectRatio(2f / 3f))
         }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                book.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (book.author.isNotBlank()) {
+                Text(
+                    book.author,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            ProgressLine(book.progress)
+        }
+        DeleteMenu(menu, { menu = false }, onDelete)
     }
 }
 
@@ -204,7 +319,7 @@ private fun Cover(book: Book, modifier: Modifier) {
         ) {
             Text(
                 book.title.take(1).uppercase(),
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }

@@ -5,9 +5,12 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.reader.data.AppSettings
 import com.example.reader.data.Book
 import com.example.reader.data.BookRepository
 import com.example.reader.data.Chapter
+import com.example.reader.data.FontChoice
+import com.example.reader.data.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +19,7 @@ import kotlinx.coroutines.withContext
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = BookRepository(app)
-    private val prefs = app.getSharedPreferences("reader", Context.MODE_PRIVATE)
+    private val store = SettingsStore(app.getSharedPreferences("reader", Context.MODE_PRIVATE))
 
     private val _books = MutableStateFlow(repo.all())
     val books: StateFlow<List<Book>> = _books
@@ -25,9 +28,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val failed = MutableStateFlow(false)
     val openBook = MutableStateFlow<Book?>(null)
     val chapters = MutableStateFlow<List<Chapter>?>(null)
-    val fontSize = MutableStateFlow(prefs.getFloat("font", 19f))
-    val serif = MutableStateFlow(prefs.getBoolean("serif", true))
-    val darkTheme = MutableStateFlow(prefs.getBoolean("dark", true))
+    val settings = MutableStateFlow(store.load())
+    val showSettings = MutableStateFlow(false)
 
     fun importBooks(uris: List<Uri>) {
         viewModelScope.launch {
@@ -68,24 +70,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _books.value = repo.all()
     }
 
-    fun saveProgress(id: String, chapter: Int, offset: Int) {
-        viewModelScope.launch(Dispatchers.IO) { repo.updateProgress(id, chapter, offset) }
+    fun saveProgress(id: String, chapter: Int, offset: Int, progress: Float) {
+        viewModelScope.launch(Dispatchers.IO) { repo.updateProgress(id, chapter, offset, progress) }
     }
 
     fun clearFailed() { failed.value = false }
 
-    fun setFontSize(v: Float) {
-        fontSize.value = v
-        prefs.edit().putFloat("font", v).apply()
+    fun update(transform: (AppSettings) -> AppSettings) {
+        val n = transform(settings.value)
+        settings.value = n
+        store.save(n)
     }
 
-    fun setDarkTheme(v: Boolean) {
-        darkTheme.value = v
-        prefs.edit().putBoolean("dark", v).apply()
-    }
-
-    fun setSerif(v: Boolean) {
-        serif.value = v
-        prefs.edit().putBoolean("serif", v).apply()
+    fun importFont(uri: Uri) {
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) { repo.importFont(uri) }
+            if (r == null) failed.value = true
+            else update { it.copy(font = FontChoice.CUSTOM, customFontPath = r.first, customFontName = r.second) }
+        }
     }
 }

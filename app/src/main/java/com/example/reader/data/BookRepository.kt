@@ -3,6 +3,7 @@ package com.example.reader.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Typeface
 import android.net.Uri
 import android.provider.OpenableColumns
 import org.json.JSONArray
@@ -18,7 +19,24 @@ class BookRepository(private val context: Context) {
     @Synchronized
     fun all(): List<Book> = list.toList()
 
-    fun load(book: Book): List<Chapter> = BookParser.parse(File(book.filePath), book.format).chapters
+    /** Fast path: binary cache. Slow path (old imports): parse once and create the cache. */
+    fun load(book: Book): List<Chapter> {
+        val cache = File(dir, "${book.id}.cache")
+        if (cache.exists()) {
+            try {
+                return ChapterCache.read(cache)
+            } catch (e: Exception) {
+                cache.delete()
+            }
+        }
+        val chapters = BookParser.splitLong(BookParser.parse(File(book.filePath), book.format).chapters)
+        try {
+            ChapterCache.write(cache, chapters)
+        } catch (e: Exception) {
+            cache.delete()
+        }
+        return chapters
+    }
 
     fun import(uri: Uri): Book? {
         val name = displayName(uri) ?: return null
@@ -41,6 +59,12 @@ class BookRepository(private val context: Context) {
             file.delete()
             return null
         }
+        val chapters = BookParser.splitLong(parsed.chapters)
+        try {
+            ChapterCache.write(File(dir, "$id.cache"), chapters)
+        } catch (e: Exception) {
+            File(dir, "$id.cache").delete()
+        }
         val cover = parsed.cover?.let { saveCover(id, it) }
         val book = Book(
             id = id,
@@ -60,19 +84,45 @@ class BookRepository(private val context: Context) {
         return book
     }
 
+    /** Copies a user font into app storage. Returns (path, display name) or null if the file is not a font. */
+    fun importFont(uri: Uri): Pair<String, String>? {
+        val name = displayName(uri) ?: "font"
+        val fontsDir = File(context.filesDir, "fonts").apply { mkdirs() }
+        val file = File(fontsDir, "custom_${System.currentTimeMillis()}.ttf")
+        try {
+            val input = context.contentResolver.openInputStream(uri) ?: return null
+            input.use { i -> file.outputStream().use { i.copyTo(it) } }
+        } catch (e: Exception) {
+            file.delete()
+            return null
+        }
+        val ok = try {
+            Typeface.Builder(file).build() != null
+        } catch (e: Exception) {
+            false
+        }
+        if (!ok) {
+            file.delete()
+            return null
+        }
+        fontsDir.listFiles()?.filter { it != file }?.forEach { it.delete() }
+        return file.absolutePath to name.substringBeforeLast('.')
+    }
+
     @Synchronized
     fun delete(book: Book) {
         list.removeAll { it.id == book.id }
         File(book.filePath).delete()
+        File(dir, "${book.id}.cache").delete()
         book.coverPath?.let { File(it).delete() }
         persist()
     }
 
     @Synchronized
-    fun updateProgress(id: String, chapter: Int, offset: Int) {
+    fun updateProgress(id: String, chapter: Int, offset: Int, progress: Float) {
         val i = list.indexOfFirst { it.id == id }
         if (i >= 0) {
-            list[i] = list[i].copy(chapter = chapter, offset = offset)
+            list[i] = list[i].copy(chapter = chapter, offset = offset, progress = progress)
             persist()
         }
     }
@@ -121,6 +171,7 @@ class BookRepository(private val context: Context) {
                 put("format", b.format); put("filePath", b.filePath)
                 put("coverPath", b.coverPath ?: ""); put("chapter", b.chapter)
                 put("offset", b.offset); put("addedAt", b.addedAt)
+                put("progress", b.progress.toDouble())
             })
         }
         index.writeText(arr.toString())
@@ -134,7 +185,8 @@ class BookRepository(private val context: Context) {
                 id = o.getString("id"), title = o.getString("title"), author = o.optString("author"),
                 format = o.getString("format"), filePath = o.getString("filePath"),
                 coverPath = o.optString("coverPath").ifEmpty { null },
-                chapter = o.optInt("chapter"), offset = o.optInt("offset"), addedAt = o.optLong("addedAt")
+                chapter = o.optInt("chapter"), offset = o.optInt("offset"), addedAt = o.optLong("addedAt"),
+                progress = o.optDouble("progress", 0.0).toFloat()
             )
         }.filter { File(it.filePath).exists() }.toMutableList()
     } catch (e: Exception) {

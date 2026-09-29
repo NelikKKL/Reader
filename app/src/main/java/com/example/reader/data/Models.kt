@@ -9,7 +9,8 @@ data class Book(
     val coverPath: String?,
     val chapter: Int,
     val offset: Int,
-    val addedAt: Long
+    val addedAt: Long,
+    val progress: Float = 0f
 )
 
 /** title is empty when the source has no chapter title. */
