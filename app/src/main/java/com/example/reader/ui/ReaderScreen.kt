@@ -162,7 +162,7 @@ fun ReaderScreen(
         val pv = WindowInsets.systemBars.asPaddingValues()
         val ld = LocalLayoutDirection.current
         val density = LocalDensity.current
-        val areaW = maxWidth - pv.calculateStartPadding(ld) - pv.calculateEndPadding(ld) - 48.dp
+        val areaW = maxWidth - pv.calculateLeftPadding(ld) - pv.calculateRightPadding(ld) - 48.dp
         val areaH = maxHeight - pv.calculateTopPadding() - pv.calculateBottomPadding() - 44.dp
         val widthPx = with(density) { areaW.toPx() }.toInt()
         val heightPx = with(density) { areaH.toPx() }.toInt()
